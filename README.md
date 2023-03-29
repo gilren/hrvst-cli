@@ -1,6 +1,6 @@
 # Harvest CLI
 
-This is a <b>quick and dirty</b> fork of [hrvst-cli] https://github.com/kgajera/hrvst-cli to make it work for multiples accounts.
+This is a <b>quick and dirty</b> fork of [hrvst-cli](https://github.com/kgajera/hrvst-cli) to make it work for multiples accounts.
 
 ## Config
 
