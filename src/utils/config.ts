@@ -5,7 +5,6 @@ import path from 'path';
 export interface Config {
   accessToken: string;
   accountIds: Record<string, string>;
-  userId: string;
   accountId: string;
   accountConfig: Record<string, AccountConfig>;
 }

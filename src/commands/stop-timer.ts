@@ -69,7 +69,7 @@ export const handler = async (args: StopTimerArguments): Promise<void> => {
         httpRequest(
           updateRequest.method,
           new postman.Url(updateRequest.url),
-          args?.account_id as string,
+          answers.account_id,
           {
             notes,
             time_entry_id: timer.id,
