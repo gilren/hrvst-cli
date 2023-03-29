@@ -1,12 +1,12 @@
-import chalk from "chalk";
-import inquirer, { ChoiceOptions } from "inquirer";
-import postman from "postman-collection";
-import { request as meRequest } from "../generated-commands/users/me";
-import { request as assignmentsRequest } from "../generated-commands/users/project-assignments/me";
-import { request as timeEntriesRequest } from "../generated-commands/time-entries/list";
-import { httpRequest } from "./postman-request-command";
-import spinner from "./spinner";
-import { Arguments } from "yargs";
+import chalk from 'chalk';
+import inquirer, { ChoiceOptions } from 'inquirer';
+import postman from 'postman-collection';
+import { request as meRequest } from '../generated-commands/users/me';
+import { request as assignmentsRequest } from '../generated-commands/users/project-assignments/me';
+import { request as timeEntriesRequest } from '../generated-commands/time-entries/list';
+import { httpRequest } from './postman-request-command';
+import spinner from './spinner';
+import { Arguments } from 'yargs';
 
 interface ProjectAssignment {
   id: number;
@@ -39,6 +39,7 @@ type TaskChoices = (projectId: number) => ChoiceOptions[] | undefined;
 type AssignmentArguments = Arguments & {
   project_id?: number;
   task_id?: number;
+  account_id: string;
 };
 
 /**
@@ -46,11 +47,11 @@ type AssignmentArguments = Arguments & {
  *
  * @returns An object containing ChoiceOptions for project and task assignments
  */
-export async function getAssignmentChoices(): Promise<{
+export async function getAssignmentChoices(args: AssignmentArguments): Promise<{
   projectChoices: ChoiceOptions[];
   taskChoices: TaskChoices;
 }> {
-  const assignments = await getProjectAssignments();
+  const assignments = await getProjectAssignments(1, args);
   const projectChoices: ChoiceOptions[] = [];
   const projectTaskAssignments: Record<number, TaskAssignment[]> = {};
   const taskChoices: TaskChoices = (projectId) =>
@@ -96,7 +97,7 @@ export async function normalizeProjectAndTaskAssignment(
   args: AssignmentArguments
 ): Promise<AssignmentArguments> {
   const { projectChoices, taskChoices } = await spinner(() =>
-    getAssignmentChoices()
+    getAssignmentChoices(args)
   );
   let argTaskChoices: ChoiceOptions[] | undefined;
 
@@ -115,16 +116,16 @@ export async function normalizeProjectAndTaskAssignment(
   // Prompt for project_id and task_id if not given as arguments
   const answers = await inquirer.prompt([
     {
-      name: "project_id",
-      type: "list",
-      message: "Select a project:",
+      name: 'project_id',
+      type: 'list',
+      message: 'Select a project:',
       choices: projectChoices,
       when: !args.project_id,
     },
     {
-      name: "task_id",
-      type: "list",
-      message: "Select a task:",
+      name: 'task_id',
+      type: 'list',
+      message: 'Select a task:',
       choices: (answers) => argTaskChoices || taskChoices(answers.project_id),
       when: !args.task_id,
     },
@@ -135,10 +136,10 @@ export async function normalizeProjectAndTaskAssignment(
 
 export async function getNotes(
   args: { editor?: boolean; notes?: string; overwrite?: boolean },
-  existingNotes: string | null = "",
+  existingNotes: string | null = '',
   promptEditor = false
 ): Promise<string> {
-  let notes = args.notes?.length ? args.notes.trim() : "";
+  let notes = args.notes?.length ? args.notes.trim() : '';
 
   if (args.editor || (!notes.length && promptEditor)) {
     notes = await getNotesFromEditor();
@@ -147,7 +148,7 @@ export async function getNotes(
   if (args.overwrite === true) {
     return notes;
   } else if (existingNotes?.length) {
-    return `${existingNotes}${notes.length ? `\n\n${notes}` : ""}`;
+    return `${existingNotes}${notes.length ? `\n\n${notes}` : ''}`;
   }
 
   return notes;
@@ -156,9 +157,9 @@ export async function getNotes(
 export async function getNotesFromEditor(): Promise<string> {
   const { notes } = await inquirer.prompt([
     {
-      name: "notes",
-      type: "editor",
-      message: "Notes",
+      name: 'notes',
+      type: 'editor',
+      message: 'Notes',
     },
   ]);
 
@@ -170,12 +171,17 @@ export async function getNotesFromEditor(): Promise<string> {
  *
  * @returns Array of project assignments
  */
-async function getProjectAssignments(page = 1): Promise<ProjectAssignment[]> {
+async function getProjectAssignments(
+  page = 1,
+  args: AssignmentArguments
+): Promise<ProjectAssignment[]> {
   const assignments: ProjectAssignment[] = [];
+  const url = new postman.Url(assignmentsRequest.url);
 
   const { data } = await httpRequest(
     assignmentsRequest.method,
-    new postman.Url(assignmentsRequest.url),
+    url,
+    args.account_id,
     {
       page,
     }
@@ -184,7 +190,7 @@ async function getProjectAssignments(page = 1): Promise<ProjectAssignment[]> {
   assignments.push(...data.project_assignments);
 
   if (data.total_pages > data.page) {
-    assignments.push(...(await getProjectAssignments(data.page + 1)));
+    assignments.push(...(await getProjectAssignments(data.page + 1, args)));
   }
 
   return assignments;
@@ -198,14 +204,15 @@ async function getProjectAssignments(page = 1): Promise<ProjectAssignment[]> {
  * @returns TimeEntry
  */
 export async function getRunningTimer(
-  promptMessage: string
+  promptMessage: string,
+  accountId: string
 ): Promise<TimeEntry | undefined> {
-  const timers = await spinner(() => getRunningTimers());
+  const timers = await spinner(() => getRunningTimers(accountId));
   let timer: TimeEntry;
 
   // Bail if there are no running timers
   if (!timers.length) {
-    console.error(chalk.yellow("You have no running timers!"));
+    console.error(chalk.yellow('You have no running timers!'));
     return;
   }
 
@@ -213,8 +220,8 @@ export async function getRunningTimer(
     // Prompt user to select a time entry if there are multiple running timers
     const answers = await inquirer.prompt([
       {
-        name: "timer",
-        type: "list",
+        name: 'timer',
+        type: 'list',
         message: promptMessage,
         choices: timers.map((t) => ({
           name: `[${new Date(t.timer_started_at).toLocaleString()}] ${
@@ -238,14 +245,18 @@ export async function getRunningTimer(
  *
  * @returns Array of time entries
  */
-export async function getRunningTimers(): Promise<TimeEntry[]> {
+export async function getRunningTimers(
+  accountId: string
+): Promise<TimeEntry[]> {
   const meResponse = await httpRequest(
     meRequest.method,
-    new postman.Url(meRequest.url)
+    new postman.Url(meRequest.url),
+    accountId
   );
   const timersResponse = await httpRequest(
     timeEntriesRequest.method,
     new postman.Url(timeEntriesRequest.url),
+    accountId,
     {
       is_running: true,
       user_id: meResponse.data.id,
@@ -258,8 +269,8 @@ export async function getRunningTimers(): Promise<TimeEntry[]> {
  * Comparator for sorting choice options
  */
 function compareChoice(a: ChoiceOptions, b: ChoiceOptions): number {
-  const aName = a.name || "";
-  const bName = b.name || "";
+  const aName = a.name || '';
+  const bName = b.name || '';
 
   if (aName < bName) {
     return -1;

@@ -1,9 +1,11 @@
-import fs from "fs";
-import ospath from "ospath";
-import path from "path";
+import fs from 'fs';
+import ospath from 'ospath';
+import path from 'path';
 
 export interface Config {
   accessToken: string;
+  accountIds: Record<string, string>;
+  userId: string;
   accountId: string;
   accountConfig: Record<string, AccountConfig>;
 }
@@ -21,7 +23,7 @@ export class ConfigNotFoundError extends Error {}
 
 export async function getConfig(): Promise<Config> {
   try {
-    const config = await fs.promises.readFile(await configPath(), "utf-8");
+    const config = await fs.promises.readFile(await configPath(), 'utf-8');
     return JSON.parse(config);
   } catch (error) {
     throw new ConfigNotFoundError();
@@ -42,11 +44,5 @@ export async function saveConfig(config: Partial<Config>): Promise<void> {
 }
 
 async function configPath(): Promise<string> {
-  const dir = path.join(ospath.home(), ".hrvst");
-
-  if (!fs.existsSync(dir)) {
-    await fs.promises.mkdir(dir);
-  }
-
-  return path.join(dir, "config.json");
+  return './config.json';
 }

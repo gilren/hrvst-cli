@@ -1,12 +1,13 @@
-import axios, { AxiosRequestConfig, AxiosResponse, Method } from "axios";
-import _ from "lodash";
-import postman from "postman-collection";
-import { Arguments, CommandModule, Options } from "yargs";
-import { getConfig } from "./config";
-import spinner from "./spinner";
-import { horizontalTable, verticalTable } from "./table";
+import axios, { AxiosRequestConfig, AxiosResponse, Method } from 'axios';
+import inquirer from 'inquirer';
+import _ from 'lodash';
+import postman from 'postman-collection';
+import { Arguments, CommandModule, Options } from 'yargs';
+import { getConfig } from './config';
+import spinner from './spinner';
+import { horizontalTable, verticalTable } from './table';
 
-export const USER_AGENT = "hrvst-cli (https://www.npmjs.com/package/hrvst-cli)";
+export const USER_AGENT = 'hrvst-cli (https://www.npmjs.com/package/hrvst-cli)';
 
 export interface Request {
   method: string;
@@ -21,10 +22,10 @@ export interface CommandConfig {
 
 type PostmanRequestArguments = Arguments & {
   fields?: string;
-  format?: "json" | "table";
+  format?: 'json' | 'table';
 };
 
-type AsyncHandlerCommandModule = Omit<CommandModule, "handler"> & {
+type AsyncHandlerCommandModule = Omit<CommandModule, 'handler'> & {
   handler: (args: Arguments) => Promise<void>;
 };
 
@@ -46,21 +47,48 @@ export default ({
       return args.options(options).version(false);
     },
     handler: async (args: PostmanRequestArguments) => {
+      const config = await getConfig();
+      let accountId: string;
+
+      if (typeof args?.account_id === 'string') {
+        accountId = args?.account_id;
+      } else {
+        const answers = await inquirer.prompt([
+          {
+            name: 'account_id',
+            type: 'list',
+            message: 'Select an account:',
+            choices: Object.entries(config.accountIds).map((el) => {
+              return { name: el[0], value: el[1] };
+            }),
+
+            when: !args.account_id,
+          },
+        ]);
+
+        accountId = answers.account_id as string;
+      }
+
       const path = request.url.path as string[];
       const resourceName = path[path.length - 1];
-      const outputFields = args.fields?.length ? args.fields.split(",") : [];
+      const outputFields = args.fields?.length ? args.fields.split(',') : [];
       let output = await spinner(async () => apiRequest());
 
       async function apiRequest(page?: number) {
-        const fetchAll = args.page === "all";
+        const fetchAll = args.page === 'all';
         const requestArgs = Object.assign({}, args);
         if (page || fetchAll) {
           requestArgs.page = page || 1;
         }
 
-        const { data } = await httpRequest(request.method, url, requestArgs);
+        const { data } = await httpRequest(
+          request.method,
+          url,
+          accountId,
+          requestArgs
+        );
         // "results" is used in responses of report endpoints
-        const objects = data[resourceName] ?? data["results"];
+        const objects = data[resourceName] ?? data['results'];
 
         if (data.page && Array.isArray(objects)) {
           if (fetchAll && data.next_page) {
@@ -74,7 +102,7 @@ export default ({
       }
 
       switch (args.output) {
-        case "json":
+        case 'json':
           if (Array.isArray(output)) {
             output = outputFields.length
               ? _.map(output, _.partialRight(_.pick, outputFields))
@@ -97,7 +125,7 @@ export default ({
                   head: outputFields.length
                     ? outputFields
                     : [
-                        "id",
+                        'id',
                         ...Object.keys(record).filter((k) =>
                           k.match(/_?(email|hours|name)$/i)
                         ),
@@ -127,9 +155,14 @@ export default ({
 export async function httpRequest<T = any>(
   method: string,
   url: postman.Url,
+  accountId: string,
   args: Partial<Arguments> = {}
 ): Promise<AxiosResponse<T>> {
   const config = await getConfig();
+
+  if (accountId === null) {
+    accountId = config.accountId;
+  }
 
   // Variable value must be a string for it to get substituted when calling getPath()
   url.variables.each(
@@ -141,7 +174,7 @@ export async function httpRequest<T = any>(
   // supporting additional query parameters (mainly for array elements that
   // will contain the index in the param name)
   for (const key in args) {
-    if (key !== "_" && key !== "$0" && !url.variables.has(key)) {
+    if (key !== '_' && key !== '$0' && !url.variables.has(key)) {
       url.query.upsert(
         new postman.QueryParam({
           key,
@@ -161,15 +194,15 @@ export async function httpRequest<T = any>(
   const options: AxiosRequestConfig = {
     baseURL: `${url.protocol}://${url.getHost()}`,
     headers: {
-      "User-Agent": USER_AGENT,
+      'User-Agent': USER_AGENT,
       Authorization: `Bearer ${config.accessToken}`,
-      "Harvest-Account-ID": config.accountId,
-      "Content-Type": "application/json",
+      'Harvest-Account-ID': accountId,
+      'Content-Type': 'application/json',
     },
     method: method as Method,
   };
 
-  if (method === "GET") {
+  if (method === 'GET') {
     options.url = url.getPathWithQuery();
   } else {
     options.url = url.getPath();
@@ -221,11 +254,11 @@ export function urlArgOptions(url: postman.Url): Record<string, Options> {
 
   // Add option to control which fields are outputted to the console
   addOption(
-    "fields",
-    "Comma separated list of fields to display in the output."
+    'fields',
+    'Comma separated list of fields to display in the output.'
   );
 
-  addOption("output", "The output format: json, table");
+  addOption('output', 'The output format: json, table');
 
   return options;
 }

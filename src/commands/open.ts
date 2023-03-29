@@ -1,37 +1,37 @@
-import chalk from "chalk";
-import inquirer from "inquirer";
-import open from "open";
-import postman from "postman-collection";
-import { CommandBuilder, CommandModule } from "yargs";
-import { request as companyRequest } from "../generated-commands/company/get";
-import { request as meRequest } from "../generated-commands/users/me";
-import { httpRequest } from "../utils/postman-request-command";
+import chalk from 'chalk';
+import inquirer from 'inquirer';
+import open from 'open';
+import postman from 'postman-collection';
+import { CommandBuilder, CommandModule } from 'yargs';
+import { request as companyRequest } from '../generated-commands/company/get';
+import { request as meRequest } from '../generated-commands/users/me';
+import { httpRequest } from '../utils/postman-request-command';
 
 const openCommands: Record<string, CommandModule> = {
   time: {
-    describe: "View your timesheet",
-    builder: (yargs) => yargs.option("week", { alias: "w", type: "boolean" }),
+    describe: 'View your timesheet',
+    builder: (yargs) => yargs.option('week', { alias: 'w', type: 'boolean' }),
     handler: async (args) =>
-      openCompanyUrl(args.week === true ? "time/week" : "time"),
+      openCompanyUrl(args.week === true ? 'time/week' : 'time'),
   } as CommandModule<{ week?: boolean }, { week?: boolean }>,
   docs: {
-    describe: "Harvest CLI documentation",
-    handler: async () => openUrl("https://kgajera.github.io/hrvst-cli"),
+    describe: 'Harvest CLI documentation',
+    handler: async () => openUrl('https://kgajera.github.io/hrvst-cli'),
   },
   accounts: {
-    describe: "Harvest account switcher",
-    handler: async () => openUrl("https://id.getharvest.com"),
+    describe: 'Harvest account switcher',
+    handler: async () => openUrl('https://id.getharvest.com'),
   },
   api: {
-    describe: "Harvest API V2 documentation",
-    handler: async () => openUrl("https://help.getharvest.com/api-v2"),
+    describe: 'Harvest API V2 documentation',
+    handler: async () => openUrl('https://help.getharvest.com/api-v2'),
   },
   expenses: {
-    describe: "Manage expenses",
-    handler: async () => openCompanyUrl("expenses"),
+    describe: 'Manage expenses',
+    handler: async () => openCompanyUrl('expenses'),
   },
   profile: {
-    describe: "Edit your profile",
+    describe: 'Edit your profile',
     handler: async () => {
       const me = await httpRequest(
         meRequest.method,
@@ -41,20 +41,20 @@ const openCommands: Record<string, CommandModule> = {
     },
   },
   reports: {
-    describe: "Run reports",
-    handler: async () => openCompanyUrl("reports"),
+    describe: 'Run reports',
+    handler: async () => openCompanyUrl('reports'),
   },
 };
 
-export const command = "open";
-export const description = "Open documentation or Harvest in your browser";
+export const command = 'open';
+export const description = 'Open documentation or Harvest in your browser';
 
 export const builder: CommandBuilder = (yargs) => {
   for (const command in openCommands) {
     // eslint-disable-next-line @typescript-eslint/ban-types
     yargs.command<{}>(
       command,
-      openCommands[command].describe || "",
+      openCommands[command].describe || '',
       openCommands[command].builder || (((yargs) => yargs) as CommandBuilder),
       openCommands[command].handler
     );
@@ -65,16 +65,16 @@ export const builder: CommandBuilder = (yargs) => {
 
 export const handler = async (): Promise<void> => {
   const { command } = await inquirer.prompt({
-    name: "command",
-    type: "list",
-    message: "Which page would you like to open in your browser",
+    name: 'command',
+    type: 'list',
+    message: 'Which page would you like to open in your browser',
     choices: Object.keys(openCommands).map((c) => ({
       name: `${c}${chalk.gray(` - ${openCommands[c].describe}`)}`,
       value: c,
     })),
   });
   if (command in openCommands) {
-    await openCommands[command].handler({ _: [], $0: "" });
+    await openCommands[command].handler({ _: [], $0: '' });
   } else {
     console.error(chalk.red(`"${command}" link not found`));
   }
